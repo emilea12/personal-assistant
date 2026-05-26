@@ -1,5 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { generateDebriefLocal } = require('./local');
 const config = require('../config');
 
 const EMPTY_DEBRIEF = {
@@ -78,9 +79,9 @@ async function generateDebrief(notes) {
   const noteContext = buildNoteContext(notes);
   if (!noteContext) return EMPTY_DEBRIEF;
   const provider = config.get('provider');
-  return provider === 'gemini'
-    ? generateDebriefGemini(noteContext)
-    : generateDebriefAnthropic(noteContext);
+  if (provider === 'gemini')    return generateDebriefGemini(noteContext);
+  if (provider === 'local')     return parseDebriefJson(await generateDebriefLocal(noteContext, DEBRIEF_PROMPT(noteContext)));
+  return generateDebriefAnthropic(noteContext);
 }
 
 module.exports = { generateDebrief };

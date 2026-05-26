@@ -24,13 +24,10 @@ function get(key) {
   if (key === 'vaultPath')       return process.env.VAULT_PATH        || stored.vaultPath        || '';
   if (key === 'anthropicApiKey') return process.env.ANTHROPIC_API_KEY || stored.anthropicApiKey  || '';
   if (key === 'geminiApiKey')    return process.env.GEMINI_API_KEY    || stored.geminiApiKey     || '';
-  if (key === 'provider')        return stored.provider || 'anthropic';
+  if (key === 'provider')        return stored.provider || 'gemini';
+  if (key === 'localApiUrl')     return stored.localApiUrl  || 'http://localhost:11434/v1';
+  if (key === 'localModel')      return stored.localModel   || 'llama3.2';
   return stored[key];
 }
 
-function getActiveApiKey() {
-  const provider = get('provider');
-  return provider === 'gemini' ? get('geminiApiKey') : get('anthropicApiKey');
-}
-
-module.exports = { load, save, get, getActiveApiKey };
+module.exports = { load, save, get };

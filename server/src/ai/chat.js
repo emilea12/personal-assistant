@@ -1,5 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { streamChatLocal } = require('./local');
 const { toggleTodo, deleteTodo, appendToDaily } = require('../vault/writer');
 const config = require('../config');
 
@@ -228,9 +229,9 @@ async function* streamChatGemini(messages, noteContext) {
 
 async function* streamChat(messages, noteContext) {
   const provider = config.get('provider');
-  const gen = provider === 'gemini'
-    ? streamChatGemini(messages, noteContext)
-    : streamChatAnthropic(messages, noteContext);
+  const gen = provider === 'gemini'   ? streamChatGemini(messages, noteContext)
+            : provider === 'local'    ? streamChatLocal(messages, noteContext)
+            : streamChatAnthropic(messages, noteContext);
   for await (const chunk of gen) yield chunk;
 }
 

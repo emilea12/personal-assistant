@@ -14,10 +14,12 @@ router.get('/', (req, res) => {
     : !!config.get('anthropicApiKey');
 
   res.json({
-    vaultPath: vaultPath || '',
+    vaultPath:   vaultPath || '',
     provider,
     hasApiKey,
-    isComplete: !!(vaultPath && hasApiKey),
+    localApiUrl: config.get('localApiUrl'),
+    localModel:  config.get('localModel'),
+    isComplete:  !!(vaultPath && (hasApiKey || provider === 'local')),
   });
 });
 
@@ -54,10 +56,24 @@ router.post('/', (req, res) => {
       updates.geminiApiKey = geminiApiKey;
     }
 
+    if (req.body.localApiUrl !== undefined) updates.localApiUrl = req.body.localApiUrl;
+    if (req.body.localModel   !== undefined) updates.localModel   = req.body.localModel;
+
     config.save(updates);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/test-local', async (req, res) => {
+  try {
+    const { testConnection } = require('../ai/local');
+    const apiUrl = req.body.apiUrl || config.get('localApiUrl');
+    const models = await testConnection(apiUrl);
+    res.json({ success: true, models });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
