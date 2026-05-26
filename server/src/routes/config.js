@@ -29,7 +29,7 @@ router.post('/', (req, res) => {
     const updates = {};
 
     if (provider !== undefined) {
-      if (!['anthropic', 'gemini'].includes(provider)) {
+      if (!['anthropic', 'gemini', 'local'].includes(provider)) {
         return res.status(400).json({ error: 'Invalid provider' });
       }
       updates.provider = provider;
@@ -79,8 +79,11 @@ router.post('/test-local', async (req, res) => {
 
 router.get('/browse', (req, res) => {
   try {
-    const requestedPath = req.query.path || os.homedir();
-    const resolved = path.resolve(requestedPath);
+    const raw = req.query.path || '';
+    const expanded = raw.startsWith('~')
+      ? raw.replace(/^~/, os.homedir())
+      : raw;
+    const resolved = expanded ? path.resolve(expanded) : os.homedir();
 
     if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
       return res.status(400).json({ error: 'Path not found' });
