@@ -1,8 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const config = require('../config');
 
-const vaultPath = process.env.VAULT_PATH;
+function getVaultPath() {
+  return config.get('vaultPath');
+}
 
 function atomicWrite(filePath, content) {
   const tmp = path.join(os.tmpdir(), `pa-${Date.now()}-${path.basename(filePath)}`);
@@ -32,7 +35,7 @@ function deleteTodo(filePath, lineNumber) {
 
 function appendToDaily(text) {
   const today = new Date().toISOString().slice(0, 10);
-  const filePath = path.join(vaultPath, `${today}.md`);
+  const filePath = path.join(getVaultPath(), `${today}.md`);
   const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   const line = `\n[${time}] ${text}`;
   if (fs.existsSync(filePath)) {

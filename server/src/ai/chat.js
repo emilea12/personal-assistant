@@ -1,7 +1,12 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { toggleTodo, deleteTodo, appendToDaily } = require('../vault/writer');
+const config = require('../config');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getClient() {
+  const key = config.get('anthropicApiKey');
+  if (!key) throw new Error('Anthropic API key not configured. Open settings to add it.');
+  return new Anthropic({ apiKey: key });
+}
 
 const tools = [
   {
@@ -73,7 +78,7 @@ ${noteContext || 'No notes loaded for the current time window.'}`;
   let currentMessages = [...messages];
 
   while (true) {
-    const stream = client.messages.stream({
+    const stream = getClient().messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,

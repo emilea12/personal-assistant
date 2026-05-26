@@ -5,6 +5,7 @@ import DebriefPanel from './components/DebriefPanel'
 import TodoList from './components/TodoList'
 import GoalsPanel from './components/GoalsPanel'
 import ChatPanel from './components/ChatPanel'
+import OnboardingWizard from './components/OnboardingWizard'
 
 const STORAGE_KEY = 'pa-window'
 
@@ -15,46 +16,51 @@ function getInitialWindow() {
       const n = parseInt(stored, 10)
       if ([3, 7, 14, 30].includes(n)) return n
     }
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
   return 7
 }
 
 export default function App() {
-  const [windowDays, setWindowDaysState] = useState(getInitialWindow)
+  const [configStatus, setConfigStatus] = useState(null) // null=loading, object=loaded
+  const [showWizard, setShowWizard] = useState(false)
 
+  const [windowDays, setWindowDaysState] = useState(getInitialWindow)
   const [todos, setTodos] = useState([])
   const [goals, setGoals] = useState([])
   const [debrief, setDebrief] = useState(null)
-
   const [loadingTodos, setLoadingTodos] = useState(false)
   const [loadingGoals, setLoadingGoals] = useState(false)
   const [loadingDebrief, setLoadingDebrief] = useState(false)
-
   const [error, setError] = useState(null)
 
   function setWindowDays(days) {
     setWindowDaysState(days)
+    try { localStorage.setItem(STORAGE_KEY, String(days)) } catch { /* ignore */ }
+  }
+
+  // Check config on mount
+  async function checkConfig() {
     try {
-      localStorage.setItem(STORAGE_KEY, String(days))
+      const res = await fetch('/api/config')
+      const data = await res.json()
+      setConfigStatus(data)
+      if (!data.isComplete) setShowWizard(true)
     } catch {
-      // ignore
+      setConfigStatus({ isComplete: false })
+      setShowWizard(true)
     }
   }
+
+  useEffect(() => { checkConfig() }, [])
 
   const fetchTodos = useCallback(async (days) => {
     setLoadingTodos(true)
     try {
       const res = await fetch(`/api/todos?window=${days}`)
       if (!res.ok) throw new Error(`Todos: HTTP ${res.status}`)
-      const data = await res.json()
-      setTodos(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoadingTodos(false)
-    }
+      setTodos(await res.json())
+    } catch (err) { setError(err.message) }
+    finally { setLoadingTodos(false) }
   }, [])
 
   const fetchGoals = useCallback(async (days) => {
@@ -62,13 +68,9 @@ export default function App() {
     try {
       const res = await fetch(`/api/goals?window=${days}`)
       if (!res.ok) throw new Error(`Goals: HTTP ${res.status}`)
-      const data = await res.json()
-      setGoals(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoadingGoals(false)
-    }
+      setGoals(await res.json())
+    } catch (err) { setError(err.message) }
+    finally { setLoadingGoals(false) }
   }, [])
 
   const fetchDebrief = useCallback(async (days) => {
@@ -80,71 +82,80 @@ export default function App() {
         body: JSON.stringify({ window: days }),
       })
       if (!res.ok) throw new Error(`Debrief: HTTP ${res.status}`)
-      const data = await res.json()
-      setDebrief(data)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoadingDebrief(false)
-    }
+      setDebrief(await res.json())
+    } catch (err) { setError(err.message) }
+    finally { setLoadingDebrief(false) }
   }, [])
 
+  // Fetch data only when config is complete and wizard is closed
   useEffect(() => {
+    if (!configStatus?.isComplete || showWizard) return
     fetchTodos(windowDays)
     fetchGoals(windowDays)
     fetchDebrief(windowDays)
-  }, [windowDays, fetchTodos, fetchGoals, fetchDebrief])
+  }, [windowDays, configStatus?.isComplete, showWizard, fetchTodos, fetchGoals, fetchDebrief])
 
-  function handleTodosUpdate() {
-    fetchTodos(windowDays)
+  function handleWizardComplete() {
+    checkConfig().then(() => setShowWizard(false))
   }
 
-  function handleDebriefRefresh() {
-    fetchDebrief(windowDays)
+  // Loading config
+  if (!configStatus) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-600 text-sm">Starting up…</div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Error toast */}
-      {error && (
-        <div className="fixed top-4 right-4 z-50 bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-xl text-sm shadow-lg flex items-center gap-3">
-          <span>⚠ {error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-200 text-lg leading-none ml-2"
-          >
-            ×
-          </button>
-        </div>
+    <>
+      {showWizard && (
+        <OnboardingWizard
+          existingConfig={configStatus}
+          onComplete={handleWizardComplete}
+        />
       )}
 
-      <div className="max-w-screen-xl mx-auto px-4 py-6">
-        <Header windowDays={windowDays} setWindowDays={setWindowDays} />
+      {!showWizard && (
+        <div className="min-h-screen">
+          {error && (
+            <div className="fixed top-4 right-4 z-50 bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-xl text-sm shadow-lg flex items-center gap-3">
+              <span>⚠ {error}</span>
+              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200 text-lg leading-none ml-2">×</button>
+            </div>
+          )}
 
-        <LifePillarsPanel debrief={debrief} loading={loadingDebrief} />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left column */}
-          <div className="flex flex-col gap-4">
-            <DebriefPanel
-              debrief={debrief}
-              loading={loadingDebrief}
-              onRefresh={handleDebriefRefresh}
+          <div className="max-w-screen-xl mx-auto px-4 py-6">
+            <Header
+              windowDays={windowDays}
+              setWindowDays={setWindowDays}
+              onOpenSettings={() => setShowWizard(true)}
             />
-            <TodoList
-              todos={todos}
-              loading={loadingTodos}
-              onUpdate={handleTodosUpdate}
-            />
-          </div>
 
-          {/* Right column */}
-          <div className="flex flex-col gap-4">
-            <GoalsPanel goals={goals} loading={loadingGoals} />
-            <ChatPanel windowDays={windowDays} />
+            <LifePillarsPanel debrief={debrief} loading={loadingDebrief} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-4">
+                <DebriefPanel
+                  debrief={debrief}
+                  loading={loadingDebrief}
+                  onRefresh={() => fetchDebrief(windowDays)}
+                />
+                <TodoList
+                  todos={todos}
+                  loading={loadingTodos}
+                  onUpdate={() => fetchTodos(windowDays)}
+                />
+              </div>
+              <div className="flex flex-col gap-4">
+                <GoalsPanel goals={goals} loading={loadingGoals} />
+                <ChatPanel windowDays={windowDays} />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   )
 }

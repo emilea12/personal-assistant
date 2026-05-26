@@ -1,19 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const matter = require('gray-matter');
+const config = require('../config');
 
-const vaultPath = process.env.VAULT_PATH;
-
-function validateVault() {
-  if (!vaultPath) {
-    console.error('ERROR: VAULT_PATH environment variable is not set.');
-    console.error('Copy .env.example to .env and set your vault path.');
-    process.exit(1);
+function getVaultPath() {
+  const vp = config.get('vaultPath');
+  if (!vp) throw new Error('Vault path not configured. Open settings to set your Obsidian vault folder.');
+  if (!fs.existsSync(vp) || !fs.statSync(vp).isDirectory()) {
+    throw new Error(`Vault path "${vp}" does not exist. Open settings to update it.`);
   }
-  if (!fs.existsSync(vaultPath) || !fs.statSync(vaultPath).isDirectory()) {
-    console.error(`ERROR: VAULT_PATH "${vaultPath}" does not exist or is not a directory.`);
-    process.exit(1);
-  }
+  return vp;
 }
 
 function windowStartDate(days) {
@@ -30,9 +26,8 @@ function parseNote(filePath) {
 }
 
 function getDailyNotes(windowDays) {
-  const start = windowStartDate(windowDays);
+  const vaultPath = getVaultPath();
   const notes = [];
-
   for (let i = 0; i <= windowDays; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -46,14 +41,11 @@ function getDailyNotes(windowDays) {
 }
 
 function getWeeklyNotes(windowDays) {
+  const vaultPath = getVaultPath();
   const start = windowStartDate(windowDays);
   const notes = [];
   let files;
-  try {
-    files = fs.readdirSync(vaultPath);
-  } catch {
-    return notes;
-  }
+  try { files = fs.readdirSync(vaultPath); } catch { return notes; }
 
   for (const file of files) {
     if (!file.endsWith('.md')) continue;
@@ -61,38 +53,30 @@ function getWeeklyNotes(windowDays) {
     const stat = fs.statSync(filePath);
     if (stat.mtime < start) continue;
 
-    // Match YYYY-WW.md or YYYY-WWW.md patterns
     if (/^\d{4}-W?\d{2}\.md$/.test(file)) {
       notes.push({ type: 'weekly', ...parseNote(filePath) });
       continue;
     }
-
-    // Detect by heading
     const raw = fs.readFileSync(filePath, 'utf8');
-    if (raw.includes('## Weekly Goals') || raw.includes('## Goals')) {
-      // Avoid double-adding daily notes
-      if (!/^\d{4}-\d{2}-\d{2}\.md$/.test(file)) {
-        notes.push({ type: 'weekly', ...parseNote(filePath) });
-      }
+    if ((raw.includes('## Weekly Goals') || raw.includes('## Goals')) &&
+        !/^\d{4}-\d{2}-\d{2}\.md$/.test(file)) {
+      notes.push({ type: 'weekly', ...parseNote(filePath) });
     }
   }
   return notes;
 }
 
 function getAllNotesInWindow(windowDays) {
+  const vaultPath = getVaultPath();
   const start = windowStartDate(windowDays);
   const daily = getDailyNotes(windowDays);
   const weekly = getWeeklyNotes(windowDays);
   const dailyPaths = new Set(daily.map(n => n.filePath));
   const weeklyPaths = new Set(weekly.map(n => n.filePath));
-
   const other = [];
+
   let files;
-  try {
-    files = fs.readdirSync(vaultPath);
-  } catch {
-    return { daily, weekly, other };
-  }
+  try { files = fs.readdirSync(vaultPath); } catch { return { daily, weekly, other }; }
 
   for (const file of files) {
     if (!file.endsWith('.md')) continue;
@@ -103,8 +87,7 @@ function getAllNotesInWindow(windowDays) {
       other.push({ type: 'note', ...parseNote(filePath) });
     }
   }
-
   return { daily, weekly, other };
 }
 
-module.exports = { validateVault, getDailyNotes, getWeeklyNotes, getAllNotesInWindow };
+module.exports = { getDailyNotes, getWeeklyNotes, getAllNotesInWindow };

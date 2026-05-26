@@ -1,6 +1,11 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const config = require('../config');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getClient() {
+  const key = config.get('anthropicApiKey');
+  if (!key) throw new Error('Anthropic API key not configured. Open settings to add it.');
+  return new Anthropic({ apiKey: key });
+}
 
 function buildNoteContext(notes) {
   const { daily, weekly, other } = notes;
@@ -27,7 +32,7 @@ async function generateDebrief(notes) {
     };
   }
 
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 2048,
     system: `You are a personal assistant analyzing someone's private journal and notes.
