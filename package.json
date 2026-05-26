@@ -4,11 +4,22 @@
   "description": "AI-powered personal assistant",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server/src/index.js",
+    "client": "cd client && npm run dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["personal-assistant", "ai"],
+  "keywords": [
+    "personal-assistant",
+    "ai"
+  ],
   "author": "emilea12",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
 }
