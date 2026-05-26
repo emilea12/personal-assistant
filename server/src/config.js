@@ -14,17 +14,23 @@ function load() {
 function save(data) {
   const dir = path.dirname(CONFIG_PATH);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const current = load();
-  const merged = { ...current, ...data };
+  const merged = { ...load(), ...data };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf8');
   return merged;
 }
 
 function get(key) {
-  // env vars take precedence for backwards compat
-  if (key === 'vaultPath') return process.env.VAULT_PATH || load().vaultPath || '';
-  if (key === 'anthropicApiKey') return process.env.ANTHROPIC_API_KEY || load().anthropicApiKey || '';
-  return load()[key];
+  const stored = load();
+  if (key === 'vaultPath')       return process.env.VAULT_PATH        || stored.vaultPath        || '';
+  if (key === 'anthropicApiKey') return process.env.ANTHROPIC_API_KEY || stored.anthropicApiKey  || '';
+  if (key === 'geminiApiKey')    return process.env.GEMINI_API_KEY    || stored.geminiApiKey     || '';
+  if (key === 'provider')        return stored.provider || 'anthropic';
+  return stored[key];
 }
 
-module.exports = { load, save, get };
+function getActiveApiKey() {
+  const provider = get('provider');
+  return provider === 'gemini' ? get('geminiApiKey') : get('anthropicApiKey');
+}
+
+module.exports = { load, save, get, getActiveApiKey };
